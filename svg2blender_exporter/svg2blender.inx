@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+    <_name>Export Front Panel</_name>
+    
+    <id>svg2blender.export</id>
+    <dependency type="executable" location="inx">svg2blender.py</dependency>
+
+	<label appearance="header">Export Front Panel</label>
+
+    <param type="path" name="output" _gui-text="Export As    " mode="file_new" filetypes="fpnl"/>
+    <param name="dpi" type="int" min="50" max="5000" _gui-text="DPI">1000</param>
+    <separator/>
+    <param name="front" type="string" gui-text="Front Layer Name        ">front</param>
+    <param name="back" type="string" gui-text="Back Layer Name         ">back</param>
+    <param name="cuts" type="string" gui-text="Cutout Layer Name     ">cuts</param>
+
+    <effect needs-live-preview="false">
+        <object-type>all</object-type>
+        <effects-menu _name="Export Front Panel">
+            <submenu _name="Svg2Blender"/>
+        </effects-menu>
+    </effect>
+
+    <script>
+        <command reldir="extensions" interpreter="python">svg2blender.py</command>
+    </script>
+</inkscape-extension>
