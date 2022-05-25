@@ -1,0 +1,3 @@
+[submodule "svg2blender_importer/custom_node_utils"]
+	path = svg2blender_importer/custom_node_utils
+	url = https://github.com/30350n/custom_node_utils

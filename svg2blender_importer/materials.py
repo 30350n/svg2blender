@@ -1,68 +1,45 @@
 import bpy
+from mathutils import Vector
 
-def create_panel_material(name, size, image_front, image_back):
-    material = bpy.data.materials.new(name)
-    material.use_nodes = True
-    nodes = material.node_tree.nodes
-    links = material.node_tree.links
+from .custom_node_utils import setup_node_tree
 
-    nodes.clear()
+M_TO_MM = 1e-3
+
+def setup_panel_material(node_tree: bpy.types.NodeTree, size, image_front, image_back):
+    node_tree.nodes.clear()
     
-    node_tex_coord = nodes.new("ShaderNodeTexCoord")
-    node_tex_coord.location = (0, 0)
+    nodes = {
+        "tex_coord": ("ShaderNodeTexCoord", {"location": (-900, 0)}, {}),
+        "separate_position": ("ShaderNodeSeparateXYZ", {"location": (-700, 0)},
+            {"Vector": ("tex_coord", "Object")}),
+        "is_bottom_layer": ("ShaderNodeMapRange", {"location": (-500, 0)}, {
+            "From Min": -1e-4, "From Max": 1e-4, "To Min": 1.0, "To Max": 0.0,
+            "Value": ("separate_position", "Z")}),
 
-    node_separate_xyz = nodes.new("ShaderNodeSeparateXYZ")
-    node_separate_xyz.location = (200, 0)
+        "tex_coord_mapped": ("ShaderNodeMapping", {"location": (-700, -200)}, {
+            "Scale": Vector((1.0 / size[0], 1.0 / size[1], 1.0)) / M_TO_MM,
+            "Vector": ("tex_coord", "Object")}),
+        "front": ("ShaderNodeTexImage",
+            {"location": (-500, -300), "interpolation": "Cubic", "image": image_front},
+            {"Vector": ("tex_coord_mapped", 0)}),
+        "back":  ("ShaderNodeTexImage",
+            {"location": (-500, -600), "interpolation": "Cubic", "image": image_back },
+            {"Vector": ("tex_coord_mapped", 0)}),
+        "color": ("ShaderNodeMixRGB", {"location": (-200, 0)}, {
+            "Color1": ("front", "Color"), "Color2": ("back", "Color"),
+            "Fac": ("is_bottom_layer", 0)}),
 
-    links.new(node_separate_xyz.inputs["Vector"], node_tex_coord.outputs["Object"])
+        "roughness": ("ShaderNodeMapRange", {"location": (-200, -200)},
+            {"To Min": 0.65, "To Max": 0.85, "Value": ("color", 0)}),
+        "bump": ("ShaderNodeBump", {"location": (-200, -480)},
+            {"Strength": 0.2, "Distance": 1e-4, "Height": ("color", 0)}),
+        "bevel": ("ShaderNodeBevel", {"location": (-200, -700)},
+            {"Radius": 1e-4, "Normal": ("bump", 0)}),
+        "shader": ("ShaderNodeBsdfPrincipled", {"location": (0, 0)}, {
+            "Base Color": ("color", 0), "Roughness": ("roughness", 0), "Normal": ("bevel", 0),
+            "Metallic": 1.0, "Clearcoat": 1.0, "Clearcoat Roughness": 0.6}),
+        "output": ("ShaderNodeOutputMaterial", {"location": (300, 0)},
+            {"Surface": ("shader", 0)}),
+    }
 
-    node_mapping = nodes.new("ShaderNodeMapping")
-    node_mapping.location = (200, -200)
-    node_mapping.inputs["Scale"].default_value[0] = 1000 / size[0]
-    node_mapping.inputs["Scale"].default_value[1] = 1000 / size[1]
-
-    links.new(node_mapping.inputs["Vector"], node_tex_coord.outputs["Object"])
-
-    node_map_range = nodes.new("ShaderNodeMapRange")
-    node_map_range.location = (400, 0)
-    node_map_range.inputs["From Min"].default_value = -0.0001
-    node_map_range.inputs["From Max"].default_value =  0.0001
-    node_map_range.inputs["To Min"].default_value = 1
-    node_map_range.inputs["To Max"].default_value = 0
-
-    links.new(node_map_range.inputs["Value"], node_separate_xyz.outputs["Z"])
-
-    node_texture_front = nodes.new("ShaderNodeTexImage")
-    node_texture_front.location = (400, -300)
-    node_texture_front.image = image_front
-    node_texture_front.interpolation = "Cubic"
-
-    links.new(node_texture_front.inputs["Vector"], node_mapping.outputs[0])
-
-    node_texture_back = nodes.new("ShaderNodeTexImage")
-    node_texture_back.location = (400, -600)
-    node_texture_back.image = image_back
-    node_texture_back.interpolation = "Cubic"
-
-    links.new(node_texture_back.inputs["Vector"], node_mapping.outputs[0])
-
-    node_mix_rgb = nodes.new("ShaderNodeMixRGB")
-    node_mix_rgb.location = (700, 0)
-
-    links.new(node_mix_rgb.inputs["Fac"], node_map_range.outputs[0])
-    links.new(node_mix_rgb.inputs["Color1"], node_texture_front.outputs["Color"])
-    links.new(node_mix_rgb.inputs["Color2"], node_texture_back.outputs["Color"])
-
-    node_shader = nodes.new("ShaderNodeBsdfPrincipled")
-    node_shader.location = (900, 0)
-    node_shader.inputs["Metallic"].default_value = 1.0
-    node_shader.inputs["Roughness"].default_value = 0.85
-
-    links.new(node_shader.inputs["Base Color"], node_mix_rgb.outputs[0])
-
-    node_output = nodes.new("ShaderNodeOutputMaterial")
-    node_output.location = (1200, 0)
-
-    links.new(node_output.inputs["Surface"], node_shader.outputs[0])
-
-    return material
+    setup_node_tree(node_tree, nodes)

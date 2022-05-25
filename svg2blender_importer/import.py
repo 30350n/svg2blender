@@ -6,7 +6,7 @@ import tempfile, random, shutil, struct
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile
 
-from .materials import create_panel_material
+from .materials import M_TO_MM, setup_panel_material
 
 FRONT = "front.png"
 BACK = "back.png"
@@ -14,8 +14,6 @@ CUTS = "cuts.svg"
 SIZE = "size"
 
 REQUIRED_MEMBERS = {FRONT, BACK, CUTS, SIZE}
-
-M_TO_MM = 1e-3
 
 class SVG2BLENDER_OT_import_fpnl(bpy.types.Operator, ImportHelper):
     """Import a front panel file"""
@@ -96,8 +94,9 @@ class SVG2BLENDER_OT_import_fpnl(bpy.types.Operator, ImportHelper):
         panel_curve.bevel_mode = "ROUND"
         panel_curve.bevel_depth = props.bevel_depth * M_TO_MM
 
-        material_name = f"{panel_obj.name}_material"
-        material = create_panel_material(material_name, size, image_front, image_back)
+        material = bpy.data.materials.new(panel_obj.name)
+        material.use_nodes = True
+        setup_panel_material(material.node_tree, size, image_front, image_back)
         panel_curve.materials.append(material)
 
         if self.setup_camera:
